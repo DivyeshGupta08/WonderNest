@@ -1,33 +1,36 @@
 from rest_framework import generics
-from .models import Product
-from .serializers import ProductSerializer
+from .models import Category, Product
+from .serializers import CategorySerializer, ProductSerializer
+
+
+class CategoryListAPIView(generics.ListAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
 
 
 class ProductListAPIView(generics.ListAPIView):
     queryset = Product.objects.filter(available=True)
-
     serializer_class = ProductSerializer
 
-    search_fields = [
-        "name",
-        "description",
-        "brand",
-    ]
 
-    filterset_fields = [
-        "category",
-        "featured",
-    ]
-
-    ordering_fields = [
-        "price",
-        "created_at",
-        "name",
-    ]
-    
 class ProductDetailAPIView(generics.RetrieveAPIView):
     queryset = Product.objects.filter(available=True)
+    serializer_class = ProductSerializer
+    lookup_field = "slug"
 
+
+class ProductCreateAPIView(generics.CreateAPIView):
+    queryset = Product.objects.all()
     serializer_class = ProductSerializer
 
+
+class ProductUpdateAPIView(generics.UpdateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    lookup_field = "slug"
+
+
+class ProductDeleteAPIView(generics.DestroyAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
     lookup_field = "slug"
