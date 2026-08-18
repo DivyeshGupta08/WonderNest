@@ -5,6 +5,7 @@ from .views import (
     OrderListView,
     OrderDetailView,
     OrderStatusUpdateView,
+    CancelOrderView,
 )
 
 
@@ -31,5 +32,11 @@ urlpatterns = [
         "<int:pk>/status/",
         OrderStatusUpdateView.as_view(),
         name="order-status-update"
+    ),
+    
+    path(
+        "<int:pk>/cancel/",
+        CancelOrderView.as_view(),
+        name="order-cancel"
     ),
 ]
