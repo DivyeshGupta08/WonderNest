@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+
 from apps.products.models import Product
 
 
@@ -81,4 +82,5 @@ class OrderItem(models.Model):
     )
 
     def __str__(self):
-        return f"{self.order.order_number} - {self.product}"
+        product_name = self.product.name if self.product else "Deleted Product"
+        return f"{self.order.order_number} - {product_name}"
