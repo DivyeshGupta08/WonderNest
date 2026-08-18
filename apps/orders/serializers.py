@@ -99,6 +99,24 @@ class CreateOrderSerializer(serializers.Serializer):
 
                 if product is None:
                     continue
+                
+                if not product.available:
+                    raise serializers.ValidationError(
+                        {
+                            "error": "Product is currently unavailable.",
+                            "product": product.name,
+                        }
+                    )
+
+                if cart_item.quantity > product.stock:
+                    raise serializers.ValidationError(
+                        {
+                            "error": "Insufficient stock.",
+                            "product": product.name,
+                            "available_stock": product.stock,
+                            "requested_quantity": cart_item.quantity,
+                        }
+                    )
 
                 price = (
                     product.discount_price
