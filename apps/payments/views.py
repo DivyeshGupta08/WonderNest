@@ -1,59 +1,64 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from apps.orders.models import Order
-
 from .models import Payment
-from .serializers import PaymentSerializer
+from .serializers import (
+    PaymentSerializer,
+    CreatePaymentSerializer,
+)
 
 
 class CreatePaymentView(generics.CreateAPIView):
+    serializer_class = CreatePaymentSerializer
+    permission_classes = [IsAuthenticated]
 
+
+class PaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
 
-    def create(self, request, *args, **kwargs):
+    def get_queryset(self):
+        return Payment.objects.filter(
+            order__user=self.request.user
+        ).select_related("order")
 
-        order_id = request.data.get("order")
 
-        if not order_id:
-            raise ValidationError(
-                {"order": "Order ID is required."}
-            )
+class PaymentDetailView(generics.RetrieveAPIView):
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
 
-        try:
-            order = Order.objects.get(
-                id=order_id,
-                user=request.user
-            )
-        except Order.DoesNotExist:
-            raise ValidationError(
-                {"order": "Order not found or does not belong to you."}
-            )
+    def get_queryset(self):
+        return Payment.objects.filter(
+            order__user=self.request.user
+        ).select_related("order")
 
-        if hasattr(order, "payment"):
-            raise ValidationError(
-                {"order": "Payment already exists for this order."}
-            )
 
-        if order.status == "CANCELLED":
-            raise ValidationError(
-                {"order": "Cannot create payment for a cancelled order."}
-            )
+class VerifyPaymentView(generics.UpdateAPIView):
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
 
-        payment = Payment.objects.create(
-            user=request.user,
-            order=order,
-            payment_method=request.data.get("payment_method"),
-            amount=order.total_amount,
-            payment_status="PENDING"
+    def get_queryset(self):
+        return Payment.objects.filter(
+            order__user=self.request.user
         )
+
+    def update(self, request, *args, **kwargs):
+        payment = self.get_object()
+
+        payment.status = "SUCCESS"
+        payment.save(update_fields=["status"])
+
+        order = payment.order
+        order.status = "CONFIRMED"
+        order.save(update_fields=["status", "updated_at"])
 
         serializer = self.get_serializer(payment)
 
         return Response(
-            serializer.data,
-            status=201
+            {
+                "message": "Payment verified successfully.",
+                "payment": serializer.data,
+            },
+            status=status.HTTP_200_OK,
         )
