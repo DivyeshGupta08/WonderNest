@@ -5,6 +5,7 @@ from .views import (
     PaymentListView,
     PaymentDetailView,
     VerifyPaymentView,
+    UpdatePaymentStatusView,
 )
 
 urlpatterns = [
@@ -30,5 +31,11 @@ urlpatterns = [
         "<int:pk>/verify/",
         VerifyPaymentView.as_view(),
         name="verify-payment",
+    ),
+    
+    path(
+        "<int:pk>/status/",
+        UpdatePaymentStatusView.as_view(),
+        name="payment-status"
     ),
 ]
