@@ -1,13 +1,16 @@
 from rest_framework import serializers
 
 from .models import Payment
-from apps.orders.models import Order
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer for displaying payment information.
 
-    # Keep API field name as "status"
-    # but connect it to model field "payment_status"
+    API uses the field name 'status',
+    while the database model uses 'payment_status'.
+    """
+
     status = serializers.CharField(
         source="payment_status",
         read_only=True
@@ -15,6 +18,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
+
         fields = [
             "id",
             "order",
@@ -37,15 +41,23 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class CreatePaymentSerializer(serializers.ModelSerializer):
+    """
+    Serializer used when creating a payment.
+    """
 
     class Meta:
         model = Payment
+
         fields = [
             "order",
             "payment_method",
         ]
 
     def validate_order(self, order):
+        """
+        Make sure the logged-in user owns the order
+        and the order has not been cancelled.
+        """
 
         user = self.context["request"].user
 
@@ -62,6 +74,9 @@ class CreatePaymentSerializer(serializers.ModelSerializer):
         return order
 
     def create(self, validated_data):
+        """
+        Create a payment using the order's total amount.
+        """
 
         user = self.context["request"].user
         order = validated_data["order"]
@@ -80,27 +95,29 @@ class CreatePaymentSerializer(serializers.ModelSerializer):
 class UpdatePaymentStatusSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(
-        source="payment_status",
         choices=[
             ("PENDING", "Pending"),
             ("SUCCESS", "Success"),
             ("FAILED", "Failed"),
+            ("REFUNDED", "Refunded"),
         ]
     )
 
     def update(self, instance, validated_data):
 
-        new_status = validated_data["payment_status"]
+        new_status = validated_data["status"]
 
+        # Payment model field is payment_status
         instance.payment_status = new_status
 
         instance.save(
             update_fields=[
                 "payment_status",
-                "updated_at"
+                "updated_at",
             ]
         )
 
+        # SUCCESS → Order becomes CONFIRMED
         if new_status == "SUCCESS":
 
             instance.order.status = "CONFIRMED"
@@ -108,10 +125,11 @@ class UpdatePaymentStatusSerializer(serializers.Serializer):
             instance.order.save(
                 update_fields=[
                     "status",
-                    "updated_at"
+                    "updated_at",
                 ]
             )
 
+        # FAILED → Order remains PENDING
         elif new_status == "FAILED":
 
             instance.order.status = "PENDING"
@@ -119,8 +137,24 @@ class UpdatePaymentStatusSerializer(serializers.Serializer):
             instance.order.save(
                 update_fields=[
                     "status",
-                    "updated_at"
+                    "updated_at",
                 ]
             )
 
-        return instance
+        # REFUNDED → Order becomes CANCELLED
+        elif new_status == "REFUNDED":
+
+            instance.order.status = "CANCELLED"
+
+            instance.order.save(
+                update_fields=[
+                    "status",
+                    "updated_at",
+                ]
+            )
+
+        return {
+            "id": instance.id,
+            "status": instance.payment_status,
+            "order": instance.order.id,
+        }
