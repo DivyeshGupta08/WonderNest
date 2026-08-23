@@ -6,6 +6,13 @@ from apps.orders.models import Order
 
 class PaymentSerializer(serializers.ModelSerializer):
 
+    # Keep API field name as "status"
+    # but connect it to model field "payment_status"
+    status = serializers.CharField(
+        source="payment_status",
+        read_only=True
+    )
+
     class Meta:
         model = Payment
         fields = [
@@ -56,13 +63,64 @@ class CreatePaymentSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
 
+        user = self.context["request"].user
         order = validated_data["order"]
 
         payment = Payment.objects.create(
+            user=user,
             order=order,
             amount=order.total_amount,
             payment_method=validated_data["payment_method"],
-            status="PENDING",
+            payment_status="PENDING",
         )
 
         return payment
+
+
+class UpdatePaymentStatusSerializer(serializers.Serializer):
+
+    status = serializers.ChoiceField(
+        source="payment_status",
+        choices=[
+            ("PENDING", "Pending"),
+            ("SUCCESS", "Success"),
+            ("FAILED", "Failed"),
+        ]
+    )
+
+    def update(self, instance, validated_data):
+
+        new_status = validated_data["payment_status"]
+
+        instance.payment_status = new_status
+
+        instance.save(
+            update_fields=[
+                "payment_status",
+                "updated_at"
+            ]
+        )
+
+        if new_status == "SUCCESS":
+
+            instance.order.status = "CONFIRMED"
+
+            instance.order.save(
+                update_fields=[
+                    "status",
+                    "updated_at"
+                ]
+            )
+
+        elif new_status == "FAILED":
+
+            instance.order.status = "PENDING"
+
+            instance.order.save(
+                update_fields=[
+                    "status",
+                    "updated_at"
+                ]
+            )
+
+        return instance
